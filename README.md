@@ -9,11 +9,11 @@
 
 ---
 
-## 🎯 Tujuan
+## Anggota 
 
-- Memahami konsep AI & Machine Learning  
-- Mengolah data emosi  
-- Membuat sistem deteksi emosi sederhana  
+- Mohammad Regieyanto 2313020003  
+- Widuh Sakara Dewa Yani 2313020074
+- Muhammad Rizky Juniarta 2313020078 
 
 ---
 
