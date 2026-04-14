@@ -9,7 +9,7 @@
 
 ---
 
-## Anggota 
+## 👤 Anggota 
 
 - Mohammad Regieyanto 2313020003  
 - Widuh Sakara Dewa Yani 2313020074
@@ -24,5 +24,5 @@ Project ini dibuat untuk tugas kuliah 💡
 ---
 
 <p align="center">
-  🚀 Dibuat dengan semangat oleh Kelompok 12
+  🚀 Dibuat oleh Kelompok 12
 </p>
