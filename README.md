@@ -24,5 +24,5 @@ Project ini dibuat untuk tugas kuliah 💡
 ---
 
 <p align="center">
-  🚀 Dibuat dengan semangat oleh Kelompok 10
+  🚀 Dibuat dengan semangat oleh Kelompok 12
 </p>
