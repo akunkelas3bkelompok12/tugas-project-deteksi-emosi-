@@ -1,6 +1,28 @@
-# tugas-project-deteksi-emosi-
 
-#Kelompok 10
--Mohammad Regieyanto NPM : 2313020003
--Widuh Sakara Dewa Yani NPM : 2313020074
--Muhammad Rizky Juniarta NPM : 2313020078
+---
+
+## ⚙️ Teknologi yang Digunakan
+
+- 🐍 Python
+- 📊 Machine Learning
+- 📁 Dataset Emosi
+
+---
+
+## 🎯 Tujuan
+
+- Memahami konsep AI & Machine Learning  
+- Mengolah data emosi  
+- Membuat sistem deteksi emosi sederhana  
+
+---
+
+## ⭐ Catatan
+
+Project ini dibuat untuk tugas kuliah 💡
+
+---
+
+<p align="center">
+  🚀 Dibuat dengan semangat oleh Kelompok 10
+</p>
