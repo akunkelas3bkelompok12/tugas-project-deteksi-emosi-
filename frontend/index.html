@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Deteksi Emosi Wajah</title>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background: #f4f4f4;
+        }
+        .container {
+            margin-top: 50px;
+            padding: 20px;
+            background: white;
+            width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        img {
+            width: 200px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        #result {
+            font-size: 18px;
+            margin-top: 15px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Deteksi Emosi Wajah</h2>
+
+    <input type="file" id="imageInput" accept="image/*">
+    <br>
+    <img id="preview" src="" alt="">
+    <br>
+    <button onclick="uploadImage()">Deteksi Emosi</button>
+
+    <div id="result"></div>
+</div>
+
+<script>
+    const input = document.getElementById("imageInput");
+    const preview = document.getElementById("preview");
+    const result = document.getElementById("result");
+
+    input.onchange = () => {
+        const file = input.files[0];
+        if (file) {
+            preview.src = URL.createObjectURL(file);
+            result.innerHTML = "";
+        }
+    };
+
+    async function uploadImage() {
+        const file = input.files[0];
+
+        if (!file) {
+            result.innerText = "Pilih gambar terlebih dahulu.";
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("image", file);
+
+        result.innerText = "Sedang memproses...";
+
+        try {
+            const response = await fetch("/predict", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                result.innerText = "Error server: " + (data.error || "Terjadi kesalahan.");
+                return;
+            }
+
+            let html = `<h3>Emosi: ${data.emosi}</h3>`;
+            html += `<p>Tingkat Keyakinan: ${data.confidence}%</p>`;
+
+            if (data.detail) {
+                html += `<h4>Rincian Skor:</h4><ul>`;
+                for (const [key, value] of Object.entries(data.detail)) {
+                    html += `<li>${key}: ${value}%</li>`;
+                }
+                html += `</ul>`;
+            }
+
+            result.innerHTML = html;
+        } catch (err) {
+            console.error(err);
+            result.innerText = "Gagal menghubungi server.";
+        }
+    }
+</script>
+
+</body>
+</html>
