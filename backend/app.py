@@ -12,12 +12,11 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
-from werkzeug.utils import secure_filename
-from tensorflow.keras.models import load_model
 
-# ===============================
-# KONFIGURASI PATH
-# ===============================
+from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import BatchNormalization
+
+
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent
 UPLOAD_FOLDER: Final[Path] = BASE_DIR / "uploads"
 MODEL_DIR: Final[Path] = BASE_DIR / "models"
@@ -29,24 +28,41 @@ CLASS_NAMES_PATH: Final[Path] = MODEL_DIR / "class_names.json"
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 MODEL_DIR.mkdir(exist_ok=True)
 
-# ===============================
-# INISIALISASI FLASK
-# ===============================
 app = Flask(__name__, template_folder="templates")
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 CORS(app)
 
-# ===============================
-# LOAD MODEL & LABEL
-# ===============================
+
+class FixedBatchNormalization(BatchNormalization):
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("renorm", None)
+        kwargs.pop("renorm_clipping", None)
+        kwargs.pop("renorm_momentum", None)
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def from_config(cls, config):
+        config.pop("renorm", None)
+        config.pop("renorm_clipping", None)
+        config.pop("renorm_momentum", None)
+        return cls(**config)
+
+
 if not MODEL_PATH.exists():
     raise FileNotFoundError(f"Model tidak ditemukan: {MODEL_PATH}")
 
 if not CLASS_NAMES_PATH.exists():
     raise FileNotFoundError(f"File class_names.json tidak ditemukan: {CLASS_NAMES_PATH}")
 
-model = load_model(MODEL_PATH)
+model = load_model(
+    MODEL_PATH,
+    custom_objects={
+        "BatchNormalization": FixedBatchNormalization,
+        "keras.layers.BatchNormalization": FixedBatchNormalization,
+    },
+    compile=False,
+)
 
 with open(CLASS_NAMES_PATH, "r", encoding="utf-8") as f:
     raw_class_names = json.load(f)
@@ -82,7 +98,6 @@ EMOSI_ID = {
     "surprise": "Terkejut",
 }
 
-# Haar cascade bawaan OpenCV
 FACE_CASCADE = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
@@ -98,14 +113,9 @@ def allowed_file(filename: str) -> bool:
 
 
 def detect_and_crop_face(image_bytes: bytes) -> np.ndarray:
-    """
-    Mengembalikan wajah hasil crop dalam bentuk grayscale.
-    Jika wajah tidak ditemukan, pakai seluruh gambar grayscale sebagai fallback.
-    """
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     image_np = np.array(image)
 
-    # RGB -> BGR untuk OpenCV
     image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 
@@ -120,27 +130,21 @@ def detect_and_crop_face(image_bytes: bytes) -> np.ndarray:
         print("Wajah tidak terdeteksi, memakai seluruh gambar.")
         return gray
 
-    # ambil wajah terbesar
     x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
 
-    # tambah margin sedikit
     margin = int(0.15 * max(w, h))
     x1 = max(0, x - margin)
     y1 = max(0, y - margin)
     x2 = min(gray.shape[1], x + w + margin)
     y2 = min(gray.shape[0], y + h + margin)
 
-    face_crop = gray[y1:y2, x1:x2]
-    print(f"Wajah terdeteksi di x={x1}, y={y1}, w={x2-x1}, h={y2-y1}")
-    return face_crop
+    return gray[y1:y2, x1:x2]
 
 
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
     face = detect_and_crop_face(image_bytes)
     face = cv2.resize(face, (48, 48))
     face = face.astype(np.float32) / 255.0
-
-    # shape: (1, 48, 48, 1)
     face = np.expand_dims(face, axis=-1)
     face = np.expand_dims(face, axis=0)
     return face
@@ -175,20 +179,14 @@ def predict():
         filepath = UPLOAD_FOLDER / filename
         file.save(filepath)
 
-        print("Gambar diterima:", file.filename)
-
         with open(filepath, "rb") as f:
             image_bytes = f.read()
 
         processed = preprocess_image(image_bytes)
-        print("Shape input ke model:", processed.shape)
-
         prediction = model.predict(processed, verbose=0)[0]
 
         if len(prediction) != len(class_names):
-            return jsonify({
-                "error": "Jumlah output model tidak sesuai dengan jumlah label."
-            }), 500
+            return jsonify({"error": "Jumlah output model tidak sesuai dengan jumlah label."}), 500
 
         index = int(np.argmax(prediction))
         emosi_en = class_names[index]
@@ -206,7 +204,7 @@ def predict():
             "confidence": round(confidence, 2),
             "scores": detail,
             "detail": detail,
-            "file": filename
+            "file": filename,
         }), 200
 
     except UnidentifiedImageError:
