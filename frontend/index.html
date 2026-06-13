@@ -1,137 +1,223 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Deteksi Emosi</title>
-
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f4f6f9;
-  margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-}
-
-.container {
-  width: 100%;
-  max-width: 420px;
-}
-
-.card {
-  background: #fff;
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-h1 {
-  margin-bottom: 8px;
-  font-size: 22px;
-  text-align: center;
-}
-
-p {
-  text-align: center;
-  color: #666;
-  margin-bottom: 20px;
-}
-
-input[type="file"] {
-  width: 100%;
-  margin-bottom: 16px;
-}
-
-button {
-  width: 100%;
-  padding: 10px;
-  border: none;
-  border-radius: 8px;
-  background: #007bff;
-  color: white;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #0056b3;
-}
-
-.result-box {
-  margin-top: 20px;
-  padding: 12px;
-  background: #f9f9f9;
-  border-radius: 8px;
-  font-size: 14px;
-  min-height: 60px;
-  white-space: pre-wrap;
-}
-
-img {
-  width: 100%;
-  margin-top: 10px;
-  border-radius: 8px;
-  display: none;
-}
-</style>
+    <meta charset="UTF-8">
+    <title>Deteksi Emosional Wajah</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background: #f4f4f4;
+        }
+        .container {
+            margin-top: 50px;
+            padding: 20px;
+            background: white;
+            width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        img {
+            width: 200px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        #result {
+            font-size: 18px;
+            margin-top: 15px;
+            text-align: left;
+        }
+    </style>
 </head>
-
 <body>
 
 <div class="container">
-  <div class="card">
-    <h1>Deteksi Emosi</h1>
-    <p>Upload gambar wajah untuk prediksi emosi</p>
+    <h2>Deteksi Emosional Wajah</h2>
 
-    <form id="form">
-      <input type="file" id="imageInput" name="image" accept="image/*" required>
-      <button type="submit">Prediksi</button>
-    </form>
+    <input type="file" id="imageInput" accept="image/*">
+    <br>
+    <img id="preview" src="" alt="">
+    <br>
+    <button onclick="uploadImage()">Deteksi Emosi</button>
 
-    <img id="preview">
-
-    <div class="result-box" id="result">
-      Belum ada prediksi
-    </div>
-  </div>
+    <div id="result"></div>
 </div>
 
 <script>
-const form = document.getElementById('form');
-const result = document.getElementById('result');
-const preview = document.getElementById('preview');
-const input = document.getElementById('imageInput');
+    const input = document.getElementById("imageInput");
+    const preview = document.getElementById("preview");
+    const result = document.getElementById("result");
+    const classNames = ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"];
+    const emosiId = {
+        angry: "Marah",
+        disgust: "Jijik",
+        fear: "Takut",
+        happy: "Senang",
+        neutral: "Netral",
+        sad: "Sedih",
+        surprise: "Terkejut"
+    };
+    let modelPromise = null;
 
-input.addEventListener('change', () => {
-  const file = input.files[0];
-  if (file) {
-    preview.src = URL.createObjectURL(file);
-    preview.style.display = 'block';
-  }
-});
+    input.onchange = () => {
+        const file = input.files[0];
+        if (file) {
+            preview.src = URL.createObjectURL(file);
+            result.innerHTML = "";
+        }
+    };
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  result.textContent = 'Memproses...';
+    async function uploadImage() {
+        const file = input.files[0];
 
-  const fd = new FormData(form);
+        if (!file) {
+            result.innerText = "Pilih gambar terlebih dahulu.";
+            return;
+        }
 
-  try {
-    const res = await fetch('/predict', {
-      method: 'POST',
-      body: fd
-    });
+        result.innerText = "Sedang memuat model...";
 
-    const data = await res.json();
-    result.textContent = JSON.stringify(data, null, 2);
+        try {
+            const model = await loadEmotionModel();
+            result.innerText = "Sedang memproses...";
+            const image = await loadImage(file);
+            const tensor = await preprocessImage(image);
+            const prediction = model.predict(tensor);
+            const scores = Array.from(await prediction.data());
+            tensor.dispose();
+            prediction.dispose();
 
-  } catch (err) {
-    result.textContent = 'Terjadi kesalahan: ' + err.message;
-  }
-});
+            const maxIndex = scores.indexOf(Math.max(...scores));
+            const emotionKey = classNames[maxIndex] || `label_${maxIndex}`;
+            const detail = {};
+
+            scores.forEach((score, index) => {
+                const key = emosiId[classNames[index]] || classNames[index] || `Label ${index}`;
+                detail[key] = Math.round(score * 10000) / 100;
+            });
+
+            const data = {
+                emosi: emosiId[emotionKey] || emotionKey,
+                confidence: Math.round(scores[maxIndex] * 10000) / 100,
+                detail
+            };
+
+            let html = `<h3>Emosi: ${data.emosi}</h3>`;
+            html += `<p>Tingkat Keyakinan: ${data.confidence}%</p>`;
+
+            if (data.detail) {
+                html += `<h4>Rincian Skor:</h4><ul>`;
+                for (const [key, value] of Object.entries(data.detail)) {
+                    html += `<li>${key}: ${value}%</li>`;
+                }
+                html += `</ul>`;
+            }
+
+            result.innerHTML = html;
+        } catch (err) {
+            console.error(err);
+            result.innerText = "Deteksi belum berhasil. Pastikan gambar berisi wajah yang jelas dan coba lagi.";
+        }
+    }
+
+    function loadEmotionModel() {
+        if (!modelPromise) {
+            modelPromise = tf.loadLayersModel("/models/model.json", { strict: false });
+        }
+        return modelPromise;
+    }
+
+    function loadImage(file) {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = reject;
+            image.src = URL.createObjectURL(file);
+        });
+    }
+
+    async function preprocessImage(image) {
+        const box = await detectFaceBox(image);
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        canvas.width = 48;
+        canvas.height = 48;
+        ctx.drawImage(
+            image,
+            box.x,
+            box.y,
+            box.width,
+            box.height,
+            0,
+            0,
+            48,
+            48
+        );
+
+        const pixels = ctx.getImageData(0, 0, 48, 48).data;
+        const values = new Float32Array(48 * 48);
+
+        for (let i = 0, j = 0; i < pixels.length; i += 4, j++) {
+            const gray = pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114;
+            values[j] = gray;
+        }
+
+        return tf.tensor4d(values, [1, 48, 48, 1]);
+    }
+
+    async function detectFaceBox(image) {
+        if ("FaceDetector" in window) {
+            try {
+                const detector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+                const faces = await detector.detect(image);
+
+                if (faces.length > 0) {
+                    const face = faces[0].boundingBox;
+                    const margin = Math.max(face.width, face.height) * 0.15;
+                    return clampBox(
+                        face.x - margin,
+                        face.y - margin,
+                        face.width + margin * 2,
+                        face.height + margin * 2,
+                        image.width,
+                        image.height
+                    );
+                }
+            } catch (err) {
+                console.warn(err);
+            }
+        }
+
+        const size = Math.min(image.width, image.height);
+        return {
+            x: (image.width - size) / 2,
+            y: (image.height - size) / 2,
+            width: size,
+            height: size
+        };
+    }
+
+    function clampBox(x, y, width, height, imageWidth, imageHeight) {
+        const x1 = Math.max(0, x);
+        const y1 = Math.max(0, y);
+        const x2 = Math.min(imageWidth, x + width);
+        const y2 = Math.min(imageHeight, y + height);
+
+        return {
+            x: x1,
+            y: y1,
+            width: Math.max(1, x2 - x1),
+            height: Math.max(1, y2 - y1)
+        };
+    }
+
 </script>
 
 </body>

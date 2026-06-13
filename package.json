@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "node": "\".tools/node/node.exe\"",
+    "npm": "\".tools/node/npm.cmd\"",
+    "netlify": "run-netlify.cmd",
+    "netlify:dev": "run-netlify.cmd dev",
+    "netlify:login": "run-netlify.cmd login",
+    "netlify:deploy": "run-netlify.cmd deploy --prod --dir=frontend"
+  }
+}

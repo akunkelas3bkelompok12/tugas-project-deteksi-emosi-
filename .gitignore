@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.tools/
+.netlify/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+uploads/
+*.log
+
+# Local Netlify folder
+.netlify
